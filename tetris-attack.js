@@ -11,8 +11,20 @@ function create() {
     // GLOBAL.cursor_layer = GLOBAL.game.add.group();
 
     game.newGame(6, 12, GLOBAL.nrBlockSprites);
-    console.log(game);
 
+    if(navigator.getGamepads().length > 1) {
+        game.cursor.setController(GamepadController.create(navigator.getGamepads()[0]));
+    }
+
+    window.addEventListener("gamepadconnected", function(e) {
+        // dynamically switch to the gamepad
+        game.cursor.setController(GamepadController.create(e.gamepad));
+    });
+
+    window.addEventListener("gamepaddisconnected", function(e) {
+        // revert to the keyboard on gamepad removal
+        game.cursor.setController(DefaultKeyboardController);
+    });
 
     GLOBAL.taGame_list[0] = game;
     MainLoop.setSimulationTimestep(1000/UPS);

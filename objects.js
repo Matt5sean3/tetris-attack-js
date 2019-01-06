@@ -1,3 +1,4 @@
+// "use strict";
 /* The Block object */
 /* States */
 const STATIC = 0;
@@ -446,8 +447,7 @@ function TaGame() {
         this.nextLine = this.newBlocks(width, 1);
         this.fillBlocks(this.nextLine, width, 1);
         this.command = null; // not done
-        this.cursor = new Cursor();
-        this.cursor.init(this);
+        this.cursor = Cursor.create(this);
         this.chain = 0;
         this.combo = [];
         this.pushTime = PUSHTIME;
@@ -813,6 +813,15 @@ function TaGame() {
      * canvas to maintain pixelart.
      */
     this.render = function() {
+
+        // Establish draw clipping to limit drawn game area
+        ctx.save();
+
+        ctx.beginPath();
+        ctx.lineWidth = 10;
+        ctx.rect(0, 0, 16 * GAME_WIDTH, 16 * (GAME_HEIGHT + 1));
+        ctx.clip();
+
         ctx.fillRect(0,0, 16*this.width, 16*(this.height+1));
         for (var x=0; x<this.width; x++) {
             for (var y=0; y<this.height; y++) {
@@ -832,8 +841,8 @@ function TaGame() {
         }
 
         ctx.fillStyle = '#FFF';
-        ctx.fillText(score, GAME_WIDTH*16 - ctx.measureText(score).width, 10);
-        ctx.fillText(chain, GAME_WIDTH*16 - ctx.measureText(chain).width, 20);
+        ctx.fillText(score, GAME_WIDTH * 16 - ctx.measureText(score).width, 10);
+        ctx.fillText(chain, GAME_WIDTH * 16 - ctx.measureText(chain).width, 20);
         ctx.fillStyle = '#000';
 
         //this.scoreText.text = text;
@@ -842,110 +851,258 @@ function TaGame() {
         //GLOBAL.cursor_layer.y = (this.pushCounter/this.pushTime) * 16;
 
         //PIXELCANVAS.pixelcontext.drawImage(GLOBAL.game.canvas, 0, 0, GAME_WIDTH*16, (GAME_HEIGHT+1)*16, 0, 0, PIXELCANVAS.pixelwidth, PIXELCANVAS.pixelheight);
+
+        ctx.restore();
+
     }
 }
 
+/* The Controller interface */
+var Controller = Object.create(null);
+Controller.init = null;
+Controller.free = null;
+Controller.bindLeft = null;
+Controller.bindRight = null;
+Controller.bindUp = null;
+Controller.bindDown = null;
+Controller.bindSwitch = null;
+Controller.bindPush = null;
 
-/* The Cursor object */
-function Cursor() {
-    this.mySelf = this;
-    this.x = null;
-    this.y = null;
-    this.left = null;
-    this.right = null;
+/* The GamepadController prototype */
+var GamepadController = Object.create(Controller);
 
-    this.sprite = null;
-    this.game = null;
-    this.controller = null;
+GamepadController.activeGamepads = [];
 
-    this.init = function(game) {
-        this.game = game;
-        // center the cursor
-        this.x = Math.floor(game.width / 2) - 1;
-        this.y = Math.floor(game.height / 3);
+GamepadController.updateAll = function() {
+    for(var i = 0; i < GamepadController.activeGamepads.length; i++) {
+        GamepadController.activeGamepads[i].update();
+    }
+}
 
-        this.left = game.blocks[this.x][this.y];
-        this.right = game.blocks[this.x+1][this.y];
+GamepadController.create = function(gamepad) {
 
-        // temp sprite
-        this.sprite = 1;
+    var controller = Object.create(GamepadController);
+    controller.gamepad = standardizeGamepad(gamepad);
 
-        //this.controller = kd;
+    return controller;
+}
 
-        kd.LEFT.press(this.mv_left.bind(this));
-        kd.RIGHT.press(this.mv_right.bind(this));
-        kd.UP.press(this.mv_up.bind(this));
-        kd.DOWN.press(this.mv_down.bind(this));
-        kd.SPACE.press(this.mv_swap.bind(this));
-        kd.C.down(this.game.pushFast.bind(this.game));
-        var keys = [
-            kd.LEFT.keyCode,
-            kd.RIGHT.keyCode,
-            kd.UP.keyCode,
-            kd.DOWN.keyCode,
-            kd.C.keyCode,
-            kd.SPACE.keyCode]
+GamepadController.update = function() {
 
-        window.addEventListener('keydown', function(e) {
-            if (keys.includes(e.keyCode)) {
-                e.preventDefault();
-            }
-        }, false);
-        /*
-        this.controller.simple_combo("left", this.mv_left.bind(this));
-        this.controller.simple_combo("right", this.mv_right.bind(this));
-        this.controller.simple_combo("down", this.mv_down.bind(this));
-        this.controller.simple_combo("up", this.mv_up.bind(this));
-        this.controller.simple_combo("space", this.mv_swap.bind(this));
-        this.controller.simple_combo("c", this.game.pushFast.bind(this.game));
-        */
+    // In SNES terms
+    // D-pad is buttons 12 (up), 13(down), 14(left), 15(right)
+    // "A" is 1, "B" is 0, "X" is 3, "Y" is 2, "L" is 4, "R" is 5
+    if( this.gamepad.buttons[12].pressed && !this.upState && this.upCb ) {
+        this.upCb();
+    }
+    this.upState = this.gamepad.buttons[12].pressed;
 
-        //this.sprite = GLOBAL.game.add.sprite(0, 0, 'cursor0', 0);
-        //this.sprite.animations.add('idle', [0, 1]);
-        //this.sprite.animations.play('idle', Math.round(GLOBAL.game.time.desiredFps/10), true);
-        //GLOBAL.cursor_layer.add(this.sprite);
+    if( this.gamepad.buttons[13].pressed && !this.downState && this.downCb ) {
+        this.downCb();
+    }
+    this.downState = this.gamepad.buttons[13].pressed;
 
-        //this.controller = GLOBAL.game.input.keyboard.createCursorKeys();
-        //this.controller.swap = GLOBAL.game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
-        //this.controller.push = GLOBAL.game.input.keyboard.addKey(Phaser.Keyboard.C);
+    if( this.gamepad.buttons[14].pressed && !this.leftState && this.leftCb ) {
+        this.leftCb();
+    }
+    this.leftState = this.gamepad.buttons[14].pressed;
 
-        //this.controller.left.onDown.add(this.mv_left, this);
-        //this.controller.right.onDown.add(this.mv_right, this);
-        //this.controller.down.onDown.add(this.mv_down, this);
-        //this.controller.up.onDown.add(this.mv_up, this);
-        //this.controller.swap.onDown.add(this.mv_swap, this);
+    if( this.gamepad.buttons[15].pressed && !this.rightState && this.rightCb ) {
+        this.rightCb();
+    }
+    this.rightState = this.gamepad.buttons[15].pressed;
+
+    // L or R are pressed, push
+    if( this.gamepad.buttons[4].pressed || this.gamepad.buttons[5].pressed ) {
+        this.pushCb();
     }
 
-    this.mv_left = function(cursor) {
-        if (this.x > 0)
-            this.x--;
+    // "A" or "B" are pressed, switch
+    if( this.gamepad.buttons[1].pressed && !this.switchState && this.switchCb ) {
+        this.switchCb();
+    }
+    this.switchState = this.gamepad.buttons[1].pressed;
+
+}
+
+GamepadController.init = function() {
+
+    this.leftState = false;
+    this.rightState = false;
+    this.upState = false;
+    this.downState = false;
+    this.switchState = false;
+    this.pushState = false;
+
+    this.leftCb = null;
+    this.rightCb = null;
+    this.upCb = null;
+    this.downCb = null;
+    this.switchCb = null;
+    this.pushCb = null;
+
+    GamepadController.activeGamepads.push(this);
+    // Needs to be run as part of the animation frame loop
+}
+
+GamepadController.free = function() {
+    GamepadController.activeGamepads.find(this);
+}
+
+GamepadController.bindLeft = function(cb) {
+    this.leftCb = cb;
+}
+
+GamepadController.bindRight = function(cb) {
+    this.rightCb = cb;
+}
+
+GamepadController.bindUp = function(cb) {
+    this.upCb = cb;
+}
+
+GamepadController.bindDown = function(cb) {
+    this.downCb = cb;
+}
+
+GamepadController.bindSwitch = function(cb) {
+    this.switchCb = cb;
+}
+
+GamepadController.bindPush = function(cb) {
+    this.pushCb = cb;
+}
+
+/* The KeyboardController prototype */
+var KeyboardController = Object.create(Controller);
+
+KeyboardController.preventDefaultCb = null;
+KeyboardController.leftKey = null;
+KeyboardController.rightKey = null;
+KeyboardController.upKey = null;
+KeyboardController.downKey = null;
+KeyboardController.switchKey = null;
+KeyboardController.pushKey = null;
+
+KeyboardController.init = function() {
+
+    if(this.preventDefaultCb) {
+        this.free();
     }
 
-    this.mv_right = function(cursor) {
-        if (this.x < this.game.width-2)
-            this.x++;
-    }
+    var keys = [
+        this.leftKey.keyCode,
+        this.rightKey.keyCode,
+        this.upKey.keyCode,
+        this.downKey.keyCode,
+        this.switchKey.keyCode,
+        this.pushKey.keyCode
+    ];
 
-    this.mv_down = function(cursor) {
-        if (this.y > 0) {
-            this.y--;
+    this.preventDefaultCb = window.addEventListener('keydown', function(e) {
+        if (keys.includes(e.keyCode)) {
+            e.preventDefault();
         }
-    }
+    }, false);
 
-    this.mv_up = function(cursor) {
-        if (this.y < this.game.height-1) {
-            this.y++;
-        }
-    }
+    this.bindLeft = this.leftKey.press.bind(kd.LEFT);
+    this.bindRight = this.rightKey.press.bind(kd.RIGHT);
+    this.bindUp = this.upKey.press.bind(kd.UP);
+    this.bindDown = this.downKey.press.bind(kd.DOWN);
+    this.bindSwitch = this.switchKey.press.bind(kd.SPACE);
+    this.bindPush = this.pushKey.down.bind(kd.C);
 
-    this.mv_swap = function() {
-        this.game.swap(this.x, this.y);
-    }
+}
 
-    this.render = function() {
-        var frames = CURSORS.animations.idle;
-        sprite_index = frames[Math.round(this.game.totalTicks / 10) % frames.length];
-        var offset = (((this.game.pushCounter > 0) ? this.game.pushCounter : 0) / this.game.pushTime) * 16;
-        ctx.drawImage(CURSORS.sprites[this.sprite], sprite_index*38, 0, 38, 22, this.x*16 - 3, this.game.height*16 - (this.y+1)*16 - 3 + offset, 38, 22);
+KeyboardController.free = function() {
+    this.leftKey.unbindPress();
+    this.rightKey.unbindPress();
+    this.upKey.unbindPress();
+    this.downKey.unbindPress();
+    this.switchKey.unbindPress();
+    this.pushKey.unbindDown();
+    window.removeEventListener('keydown', this.preventDefaultCb);
+    this.preventDefaultCb = null;
+}
+
+/* The DefaultKeyboardController prototype */
+var DefaultKeyboardController = Object.create(KeyboardController);
+
+DefaultKeyboardController.leftKey = kd.LEFT;
+DefaultKeyboardController.rightKey = kd.RIGHT;
+DefaultKeyboardController.upKey = kd.UP;
+DefaultKeyboardController.downKey = kd.DOWN;
+DefaultKeyboardController.switchKey = kd.SPACE;
+DefaultKeyboardController.pushKey = kd.C;
+
+// TODO add support for customizable keyboard controls
+
+/* The Cursor prototype */
+var Cursor = Object.create(null);
+Cursor.x = null;
+Cursor.y = null;
+Cursor.left = null;
+Cursor.right = null;
+Cursor.sprite = null;
+Cursor.game = null;
+Cursor.controller = null;
+
+Cursor.create = function(game) {
+
+    var cursor = Object.create(Cursor);
+    this.game = game;
+    // center the cursor
+    cursor.x = Math.floor(game.width / 2) - 1;
+    cursor.y = Math.floor(game.height / 3);
+
+    cursor.left = game.blocks[cursor.x][cursor.y];
+    cursor.right = game.blocks[cursor.x+1][cursor.y];
+
+    // temp sprite
+    cursor.sprite = 1;
+
+    cursor.setController(DefaultKeyboardController);
+
+    return cursor;
+}
+
+Cursor.setController = function(controller) {
+    if(this.controller != null) {
+        this.controller.free();
     }
+    this.controller = controller;
+    this.controller.init();
+    this.controller.bindLeft(this.mv_left.bind(this));
+    this.controller.bindRight(this.mv_right.bind(this));
+    this.controller.bindUp(this.mv_up.bind(this));
+    this.controller.bindDown(this.mv_down.bind(this));
+    this.controller.bindSwitch(this.mv_swap.bind(this));
+    this.controller.bindPush(this.game.pushFast.bind(this.game));
+}
+
+Cursor.mv_left = function(cursor) {
+    this.x -= this.x > 0;
+}
+
+Cursor.mv_right = function(cursor) {
+    this.x += (this.x < this.game.width - 2);
+}
+
+Cursor.mv_down = function(cursor) {
+    this.y -= (this.y > 0);
+}
+
+Cursor.mv_up = function(cursor) {
+    this.y += this.y < this.game.height - 1;
+}
+
+Cursor.mv_swap = function() {
+    this.game.swap(this.x, this.y);
+}
+
+Cursor.render = function() {
+    var frames = CURSORS.animations.idle;
+    var sprite_index = frames[Math.round(this.game.totalTicks / 10) % frames.length];
+    var offset = (((this.game.pushCounter > 0) ? this.game.pushCounter : 0) / this.game.pushTime) * 16;
+    ctx.drawImage(CURSORS.sprites[this.sprite], sprite_index*38, 0, 38, 22, this.x*16 - 3, this.game.height*16 - (this.y+1)*16 - 3 + offset, 38, 22);
 }

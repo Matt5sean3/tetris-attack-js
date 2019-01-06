@@ -43,3 +43,6 @@ const GLOBAL = {game: null,
 const PIXELCANVAS = {pixelcontent: null,
                      pixelwidth: 0,
                      pixelheight: 0}
+
+const GAMEPAD_DEBUGGER_HEIGHT = 100;
+const GAMEPAD_DEBUGGER_WIDTH = 50;
